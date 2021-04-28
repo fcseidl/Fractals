@@ -2,12 +2,16 @@
 Module for classes implementing the interface for pixelated fractals.
 TODO: I might make a superclass for the interface with subclasses inheriting 
 it if I want more different types of fractals?
+
+TODO: arbitrary precision. Because 2^64 is only 0% of |C|.
+
+Not that arbitrary precision would let us decide more than 0% of C...
 '''
 
 import numpy as np
 
 
-# find min n for which |f^n(c)| > thres, -1 if not found
+# find min n for which |f^n(c)| > thres, max_iter if not found
 def escapeTime(f, c, thres, max_iter):
     #if c == 0:   # avoid weird stuff
     #    return -1
@@ -16,7 +20,7 @@ def escapeTime(f, c, thres, max_iter):
         z = f(z)
         if np.abs(z) > thres:
             return it
-    return -1
+    return max_iter
 
 class MandelbrotGreyscale:
     ''''
@@ -28,6 +32,9 @@ class MandelbrotGreyscale:
         Aspect ratio (u_max, v_max) to display.
     pixels_per_unit: numeric, optional
         Determines image scale. Default is u_max/4.
+    n_colors: int, optional
+        Determines number of lemniscates to draw in addition to the set itself.
+        Default is 5.
     window_center: complex
         Display centers on this point. Default is 0.
     exponent: complex, optional, default is 2.
@@ -51,6 +58,7 @@ class MandelbrotGreyscale:
     def __init__(self, 
                  aspect_ratio, 
                  pixels_per_unit=None, 
+                 n_colors=5,
                  window_center=0,
                  exponent=2, 
                  julia_param=None,
@@ -60,6 +68,7 @@ class MandelbrotGreyscale:
             self.pixels_per_unit = aspect_ratio[0] / 4
         else:
             self.pixels_per_unit = pixels_per_unit
+        self.n_colors = n_colors
         self.window_center = complex(window_center)
         self.exponent = exponent
         self.julia_param = julia_param
@@ -78,8 +87,12 @@ class MandelbrotGreyscale:
         imag = imag_min + 1. * (v_max - v) / self.pixels_per_unit
         return real + imag*(0+1j)
     
-    # return the color of a pixel
-    def color(self, u, v):
+    # get color of point from its escape time
+    def colorFromTime(self, time):
+        # code quality? never met her
+        return 255 / self.n_colors * np.ceil(self.n_colors * (self.max_iter**0.5 - time**0.5) / self.max_iter**0.5)
+    
+    def pixelColor(self, u, v):
         point = self.pixelSpaceToC(u, v)
         if self.julia_param is None:
             f = lambda z : z**self.exponent + point
@@ -87,8 +100,11 @@ class MandelbrotGreyscale:
             f = lambda z : z**self.exponent + self.julia_param
         thres = 4
         time = escapeTime(f, point, thres, self.max_iter)
-        if time < 0:
-            color = 0
-        else:
-            color = 255 * (self.max_iter - time) / self.max_iter
-        return color
+        return self.colorFromTime(time)
+    
+    # Return a list of all colors used. More external colors are later.
+    def colors(self):
+        result = np.array([self.colorFromTime(t) for t in range(self.max_iter + 1)])
+        result = np.unique(result)
+        return list(result)
+    

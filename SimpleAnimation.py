@@ -1,5 +1,7 @@
 '''
 Display an animation from a sequence of frames in a pygame window.
+
+TODO: dump animation to video file (with opencv?)
 '''
 
 import pygame
