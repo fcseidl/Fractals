@@ -9,6 +9,7 @@ Not that arbitrary precision would let us decide more than 0% of C...
 '''
 
 import numpy as np
+from numpy import random
 
 
 # find min n for which |f^n(c)| > thres, max_iter if not found
@@ -58,26 +59,58 @@ class MandelbrotGreyscale:
     def __init__(self, 
                  aspect_ratio, 
                  pixels_per_unit=None, 
-                 n_colors=5,
+                 n_colors=7,
                  window_center=0,
                  exponent=2, 
                  julia_param=None,
                  max_iter=100):
+        # describe fractal as a subset of C
+        self.exponent = exponent
+        self.julia_param = julia_param
+        self.max_iter = max_iter
+        # describe visualization in pixel space
         self.aspect_ratio = aspect_ratio
         if pixels_per_unit is None:
             self.pixels_per_unit = aspect_ratio[0] / 4
         else:
             self.pixels_per_unit = pixels_per_unit
         self.n_colors = n_colors
-        self.window_center = complex(window_center)
-        self.exponent = exponent
-        self.julia_param = julia_param
-        self.max_iter = max_iter
+        self.adjustZoom(1, window_center)
     
+    # adjust zoom and recalculate quantiles for histogram coloring
+    # TODO: avoid repeat quantiles?
     def adjustZoom(self, scale_factor, new_window_center):
+        # set view window
         self.pixels_per_unit *= scale_factor
         self.window_center = complex(new_window_center)
-
+        # randomly sample a bunch of escape times
+        u_max, v_max = self.aspect_ratio
+        n_samp = 10 * self.max_iter * self.n_colors
+        u = random.randint(u_max, size=n_samp)
+        v = random.randint(v_max, size=n_samp)
+        points = self.pixelSpaceToC(u, v)
+        times = sorted([self.escapeTime(p) for p in points])
+        # set quantiles for histogram coloring
+        self.time_quantiles = []
+        for n in range(1, self.n_colors + 1):
+            quantile = times[n * int(n_samp / (self.n_colors + 1))]
+            if n > 1:
+                floor = self.time_quantiles[-1] + 1
+            else:
+                floor = 0
+            self.time_quantiles.append(max(quantile, floor))
+        self.time_quantiles.append(self.max_iter)
+        self.time_quantiles = np.array(self.time_quantiles)
+        
+    # choose a random point in frame from a fractal by rejection sampling
+    def chooseFromFractal(self):
+        u_max, v_max = self.aspect_ratio
+        u, v = (0, 0)
+        while self.pixelColor(u, v) > 0:
+            u = random.randint(u_max)
+            v = random.randint(v_max)
+        return u, v
+    
     # convert pixel coords to point in the complex plane
     def pixelSpaceToC(self, u, v):
         u_max, v_max = self.aspect_ratio
@@ -87,19 +120,30 @@ class MandelbrotGreyscale:
         imag = imag_min + 1. * (v_max - v) / self.pixels_per_unit
         return real + imag*(0+1j)
     
-    # get color of point from its escape time
-    def colorFromTime(self, time):
-        # code quality? never met her
-        return 255 / self.n_colors * np.ceil(self.n_colors * (self.max_iter**0.5 - time**0.5) / self.max_iter**0.5)
-    
-    def pixelColor(self, u, v):
-        point = self.pixelSpaceToC(u, v)
+    # find min n for which |f^n(c)| > 4, max_iter if not found
+    def escapeTime(self, point):
         if self.julia_param is None:
             f = lambda z : z**self.exponent + point
         else:
             f = lambda z : z**self.exponent + self.julia_param
-        thres = 4
-        time = escapeTime(f, point, thres, self.max_iter)
+        z = point
+        for it in range(self.max_iter):
+            z = f(z)
+            if np.abs(z) > 4:
+                return it
+        return self.max_iter
+    
+    # get color of point from its escape time
+    def colorFromTime(self, time):
+        # code quality? never met her
+        #return 255 / self.n_colors * np.ceil(self.n_colors * (self.max_iter - time) / self.max_iter)
+        return int(255 / (self.n_colors + 1)) * (self.time_quantiles > time).sum()
+        
+    # return color of a pixel
+    # TODO: histogram coloring
+    def pixelColor(self, u, v):
+        point = self.pixelSpaceToC(u, v)
+        time = self.escapeTime(point)
         return self.colorFromTime(time)
     
     # Return a list of all colors used. More external colors are later.
