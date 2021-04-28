@@ -25,7 +25,7 @@ def escapeTime(f, c, thres, max_iter):
 
 class MandelbrotGreyscale:
     ''''
-    Pixel-coloring object for visualizing multibrot and julia sets.
+    Pixel-coloring object for visualizing multibrot and multi-Julia sets.
     
     Parameters
     ----------
@@ -78,7 +78,6 @@ class MandelbrotGreyscale:
         self.adjustZoom(1, window_center)
     
     # adjust zoom and recalculate quantiles for histogram coloring
-    # TODO: avoid repeat quantiles?
     def adjustZoom(self, scale_factor, new_window_center):
         # set view window
         self.pixels_per_unit *= scale_factor

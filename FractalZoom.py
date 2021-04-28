@@ -4,7 +4,6 @@ numpy arrays, in the input format of the SimpleAnimation module.
 '''
 
 import numpy as np
-from numpy import random
 from SimpleAnimation import animate
 from PixelatedFractal import MandelbrotGreyscale
 
@@ -176,18 +175,32 @@ class BorderTracer:
                 prev = current
         print('finished tracing column')
     
+    # after tracing borders, fill region interiors
+    def fillRegions(self):
+        print('filling in colored regions')
+        u_max, v_max = pixelated_fractal.aspect_ratio
+        for u in range(u_max):
+            if u % self.speed == 0:
+                yield self.frame
+            idx = self.trace[u, 0]
+            for v in range(1, v_max):
+                if self.trace[u, v] == self.NOT_COMPUTED:
+                    self.frame[u, v] = self.colors[idx]
+                else:
+                    idx = self.trace[u, v]
+    
     # animate tracing all borders
     def generate(self):
         print('need to trace colors indexed by', 
               np.argwhere(self.traced_idxs - 1).reshape(-1))
-        print(self.colors, '\n', self.traced_idxs)
         yield from self.traceEdges()
-        while not self.traced_idxs.all():
+        if not self.traced_idxs.all():
             print('need to trace colors indexed by', 
                   np.argwhere(self.traced_idxs - 1).reshape(-1))
-            print(self.colors, '\n', self.traced_idxs)
             u, v = self.pixelated_fractal.chooseFromFractal()
             yield from self.traceCol(u)
+        yield from self.fillRegions()
+        
 
     
 # fill a frame with a pixelated fractal from the top
@@ -231,16 +244,25 @@ def fractalZoom(pixelated_fractal, scale_factor=4):
     zoom_level = 1
     while True:
         print('Zoom level %f' % zoom_level)
-        frame = yield from fillFromTop(frame, pixelated_fractal, thickness=10)
+        tracer = BorderTracer(frame, pixelated_fractal, speed=200)
+        yield from tracer.generate()
+        #frame = yield from fillFromTop(frame, pixelated_fractal, thickness=10)
         u, v = findLeftBorder(frame)
         frame = yield from magnifySubframe(u, v, frame, scale_factor, duration=30)
         new_window_center = pixelated_fractal.pixelSpaceToC(u, v)
         pixelated_fractal.adjustZoom(scale_factor, new_window_center)
         zoom_level *= scale_factor
-    
+
 
 # example zoom
 if __name__ == '__main__':
+    from numpy import random
+    seed = random.randint(1000000)
+    
+    seed = 499037 # this one's cool
+    print('random seed =', seed)
+    random.seed(seed)
+    
     aspect_ratio = (960, 720)
     exponent = 2
     mandelbrot = MandelbrotGreyscale(aspect_ratio, exponent=exponent, max_iter=100)
@@ -248,11 +270,11 @@ if __name__ == '__main__':
     julia_param = mandelbrot.pixelSpaceToC(u, v)
     pixelated_fractal = MandelbrotGreyscale(aspect_ratio,
                                             exponent=exponent,
-                                            n_colors=6,
+                                            n_colors=5,
                                             julia_param=julia_param,
                                             max_iter=100)
-    
-    # TODO: this is temporary
+    frame_iterator = fractalZoom(pixelated_fractal, scale_factor=6)
+    '''# TODO: this is temporary
     
     print(pixelated_fractal.n_colors)
     frame = 255 * np.ones((960, 720, 3))
@@ -260,7 +282,7 @@ if __name__ == '__main__':
     def temp_frame_iterator():
         #yield from fillFromTop(frame, pixelated_fractal, thickness=10)
         tracer = BorderTracer(frame, pixelated_fractal, speed=100)
-        yield from tracer.generate()
+        yield from tracer.generate()'''
         
-    animate(aspect_ratio, temp_frame_iterator(), frame_rate=30)
+    animate(aspect_ratio, frame_iterator, frame_rate=30)
     
