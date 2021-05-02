@@ -1,5 +1,5 @@
 '''
-Display an animation from a sequence of frames in a pygame window.
+Create animations out of sequences of numpy arrays.
 
 TODO: dump animation to video file (with opencv?)
 '''

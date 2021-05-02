@@ -4,6 +4,7 @@ numpy arrays, in the input format of the SimpleAnimation module.
 '''
 
 import numpy as np
+from skimage.transform import rescale
 from SimpleAnimation import animate
 from PixelatedFractal import MandelbrotGreyscale
 
@@ -13,21 +14,6 @@ RED = np.array([255, 0, 0])
 
 # AUXILIARY FUNCTIONS
 # TODO: make generators be classes with these as member functions?
-
-# TODO: this might need to be faster/smoother
-# create array of different size with nearest-neighbor tiling
-def resample(frame, new_aspect):
-    w_old, h_old, _ = frame.shape
-    w_new, h_new = new_aspect
-    w_scale = w_old / w_new
-    h_scale = h_old / h_new
-    result = np.empty((w_new, h_new, 3))
-    for i_new in range(w_new):
-        i_old = int(w_scale * i_new)
-        for j_new in range(h_new):
-            j_old = int(h_scale * j_new)
-            result[i_new, j_new] = frame[i_old, j_old]
-    return result
 
 # TODO: this sucks, find a better way to do it!
 # find a point on the border of the fractal
@@ -188,9 +174,12 @@ class BorderTracer:
                     self.frame[u, v] = self.colors[idx]
                 else:
                     idx = self.trace[u, v]
+        print('finished filling')
     
     # animate tracing all borders
     def generate(self):
+        print(self.colors)
+        print(self.pixelated_fractal.time_quantiles)
         print('need to trace colors indexed by', 
               np.argwhere(self.traced_idxs - 1).reshape(-1))
         yield from self.traceEdges()
@@ -202,7 +191,6 @@ class BorderTracer:
         yield from self.fillRegions()
         
 
-    
 # fill a frame with a pixelated fractal from the top
 def fillFromTop(frame, pixelated_fractal, thickness=1):
     u_max, v_max = pixelated_fractal.aspect_ratio
@@ -214,6 +202,8 @@ def fillFromTop(frame, pixelated_fractal, thickness=1):
         yield frame
     return frame
 
+
+# TODO: try using skimage.transform.rescale
 # Zoom to region of frame centered on u, v with specified scale.
 # Note that the region must be entirely contained in the frame!
 def magnifySubframe(u, v, frame, scale_factor, duration):
@@ -231,12 +221,11 @@ def magnifySubframe(u, v, frame, scale_factor, duration):
             v_t = int((duration - t) * v_top / duration)
             w_t = int((t * u_max + (duration - t) * box_width) / duration)
             h_t = int((t * v_max + (duration - t) * box_height) / duration)
-            frame[u_t:u_t+w_t, v_t:v_t+h_t] \
-                = resample(magnify, (w_t, h_t))
+            magnified = rescale(magnify, (w_t/box_width, h_t/box_height, 1))
+            frame[u_t:u_t+w_t, v_t:v_t+h_t] = magnified
             yield frame
     except IndexError:
         raise ValueError('subregion to magnify must be contained in current frame')
-    return frame
      
 def fractalZoom(pixelated_fractal, scale_factor=4):
     u_max, v_max = pixelated_fractal.aspect_ratio
@@ -244,11 +233,11 @@ def fractalZoom(pixelated_fractal, scale_factor=4):
     zoom_level = 1
     while True:
         print('Zoom level %f' % zoom_level)
-        tracer = BorderTracer(frame, pixelated_fractal, speed=200)
+        tracer = BorderTracer(frame, pixelated_fractal, speed=1000)
         yield from tracer.generate()
-        #frame = yield from fillFromTop(frame, pixelated_fractal, thickness=10)
+        #frame = yield from fillFromTop(frame, pixelated_fractal, thickness=50)
         u, v = findLeftBorder(frame)
-        frame = yield from magnifySubframe(u, v, frame, scale_factor, duration=30)
+        yield from magnifySubframe(u, v, frame, scale_factor, duration=20)
         new_window_center = pixelated_fractal.pixelSpaceToC(u, v)
         pixelated_fractal.adjustZoom(scale_factor, new_window_center)
         zoom_level *= scale_factor
@@ -259,20 +248,22 @@ if __name__ == '__main__':
     from numpy import random
     seed = random.randint(1000000)
     
-    seed = 499037 # this one's cool
+    #seed = 840746 # cool awesome but bugged
+    #seed = 949588 # also bugged
+    
     print('random seed =', seed)
     random.seed(seed)
     
-    aspect_ratio = (960, 720)
+    aspect_ratio = (1400, 800)
     exponent = 2
-    mandelbrot = MandelbrotGreyscale(aspect_ratio, exponent=exponent, max_iter=100)
+    mandelbrot = MandelbrotGreyscale((960, 720), exponent=exponent, max_iter=100)
     u, v = mandelbrot.chooseFromFractal()
     julia_param = mandelbrot.pixelSpaceToC(u, v)
     pixelated_fractal = MandelbrotGreyscale(aspect_ratio,
                                             exponent=exponent,
-                                            n_colors=5,
+                                            n_colors=10,
                                             julia_param=julia_param,
-                                            max_iter=100)
+                                            max_iter=150)
     frame_iterator = fractalZoom(pixelated_fractal, scale_factor=6)
     '''# TODO: this is temporary
     
