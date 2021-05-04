@@ -1,19 +1,32 @@
 '''
 Uses the PixelatedFractals module to animate fractal zooms as sequences of 
 numpy arrays, in the input format of the SimpleAnimation module.
+
+TODO: fix streaking bug
+TODO: pretty colors!
+TODO: automatic interesting zoom
+TODO: quiet mode to minimize printed output
+TODO: loop mode to look cool for longer + find noteworthy seeds
+TODO: skew distribution toward interesting fractals
+
+One of these might obviate need for the other:
+TODO: Moore-neighbor tracing?
+TODO: use subpixel resolution in PixelatedFractal object?
+
+# way hard:
+TODO: continuous zoom
 '''
 
 import numpy as np
 from skimage.transform import rescale
-from SimpleAnimation import animate
-from PixelatedFractal import MandelbrotGreyscale
+from simple_animation import animate
+from pixelated_fractals import PixelatedFractal
 
 
 RED = np.array([255, 0, 0])
 
 
 # AUXILIARY FUNCTIONS
-# TODO: make generators be classes with these as member functions?
 
 # TODO: this sucks, find a better way to do it!
 # find a point on the border of the fractal
@@ -56,7 +69,10 @@ class BorderTracer:
         if self.trace[u, v] == self.NOT_COMPUTED:
             c = self.pixelated_fractal.pixelColor(u, v)
             self.frame[u, v] = c
-            self.trace[u, v] = self.colors.index(c)
+            idx = 0
+            while (self.colors[idx] != c).any():
+                idx += 1
+            self.trace[u, v] = idx
         return self.trace[u, v]
     
     # Trace along the border of the lemniscate starting at u, v.
@@ -102,8 +118,6 @@ class BorderTracer:
         prev = self.safeDynamicIndex(0, 0)
         # top
         for u in range(1, u_max):
-            '''if u % self.speed == 0:
-                yield self.frame'''
             current = self.safeDynamicIndex(u, 0)
             if current != prev:
                 if current < prev:
@@ -112,8 +126,6 @@ class BorderTracer:
                 prev = current
         # right
         for v in range(1, v_max):
-            '''if v % self.speed == 0:
-                yield self.frame'''
             current = self.safeDynamicIndex(u_max-1, v)
             if current != prev:
                 if current < prev:
@@ -122,8 +134,6 @@ class BorderTracer:
                 prev = current
         # bottom
         for u in range(u_max-2, -1, -1):
-            '''if u % self.speed == 0:
-                yield self.frame'''
             current = self.safeDynamicIndex(u, v_max-1)
             if current != prev:
                 if current < prev:
@@ -132,8 +142,6 @@ class BorderTracer:
                 prev = current
         # left
         for v in range(v_max-2, -1, -1):
-            '''if v % self.speed == 0:
-                yield self.frame'''
             current = self.safeDynamicIndex(0, v)
             if current != prev:
                 if current < prev:
@@ -150,8 +158,6 @@ class BorderTracer:
         u_max, v_max = pixelated_fractal.aspect_ratio
         prev = self.safeDynamicIndex(u, 0)
         for v in range(1, v_max):
-            '''if v % self.speed == 0:
-                yield self.frame'''
             current = self.safeDynamicIndex(u, v)
             if current != prev:
                 for idx in range(current, prev):
@@ -179,7 +185,6 @@ class BorderTracer:
     # animate tracing all borders
     def generate(self):
         print(self.colors)
-        print(self.pixelated_fractal.time_quantiles)
         print('need to trace colors indexed by', 
               np.argwhere(self.traced_idxs - 1).reshape(-1))
         yield from self.traceEdges()
@@ -203,7 +208,6 @@ def fillFromTop(frame, pixelated_fractal, thickness=1):
     return frame
 
 
-# TODO: try using skimage.transform.rescale
 # Zoom to region of frame centered on u, v with specified scale.
 # Note that the region must be entirely contained in the frame!
 def magnifySubframe(u, v, frame, scale_factor, duration):
@@ -233,9 +237,9 @@ def fractalZoom(pixelated_fractal, scale_factor=4):
     zoom_level = 1
     while True:
         print('Zoom level %f' % zoom_level)
-        tracer = BorderTracer(frame, pixelated_fractal, speed=1000)
-        yield from tracer.generate()
-        #frame = yield from fillFromTop(frame, pixelated_fractal, thickness=50)
+        '''tracer = BorderTracer(frame, pixelated_fractal, speed=1000)
+        yield from tracer.generate()'''
+        frame = yield from fillFromTop(frame, pixelated_fractal, thickness=50)
         u, v = findLeftBorder(frame)
         yield from magnifySubframe(u, v, frame, scale_factor, duration=20)
         new_window_center = pixelated_fractal.pixelSpaceToC(u, v)
@@ -248,32 +252,25 @@ if __name__ == '__main__':
     from numpy import random
     seed = random.randint(1000000)
     
-    #seed = 840746 # cool awesome but bugged
+    seed = 411405   # probably gorgeous with exponent 3.11, but bugged
+    #seed = 540173   # cool with exponed 2.34
+    #seed = 840746 # cool
     #seed = 949588 # also bugged
+    #seed = 997706   # she bugged
     
     print('random seed =', seed)
     random.seed(seed)
     
     aspect_ratio = (1400, 800)
-    exponent = 2
-    mandelbrot = MandelbrotGreyscale((960, 720), exponent=exponent, max_iter=100)
+    exponent = 3.11
+    mandelbrot = PixelatedFractal((960, 720), exponent=exponent, max_iter=100)
     u, v = mandelbrot.chooseFromFractal()
     julia_param = mandelbrot.pixelSpaceToC(u, v)
-    pixelated_fractal = MandelbrotGreyscale(aspect_ratio,
-                                            exponent=exponent,
-                                            n_colors=10,
-                                            julia_param=julia_param,
-                                            max_iter=150)
+    pixelated_fractal = PixelatedFractal(aspect_ratio,
+                                         exponent=exponent,
+                                         n_colors=4,
+                                         julia_param=julia_param,
+                                         max_iter=150)
     frame_iterator = fractalZoom(pixelated_fractal, scale_factor=6)
-    '''# TODO: this is temporary
-    
-    print(pixelated_fractal.n_colors)
-    frame = 255 * np.ones((960, 720, 3))
-    
-    def temp_frame_iterator():
-        #yield from fillFromTop(frame, pixelated_fractal, thickness=10)
-        tracer = BorderTracer(frame, pixelated_fractal, speed=100)
-        yield from tracer.generate()'''
-        
     animate(aspect_ratio, frame_iterator, frame_rate=30)
     

@@ -1,18 +1,20 @@
 '''
 Module for classes implementing the interface for pixelated fractals.
+
 TODO: I might make a superclass for the interface with subclasses inheriting 
 it if I want more different types of fractals?
 
-TODO: arbitrary precision. Because 2^64 is only 0% of |C|.
-
-Not that arbitrary precision would let us decide more than 0% of C...
+TODO: cycle detection for quick termination of escape time algorithm
+TODO: arbitrary precision. Because 2^64 is only 0% of |C|. Not that arbitrary 
+precision would let us decide more than 0% of C...
+TODO: option for coloring based on how far away we get in fixed time
 '''
 
 import numpy as np
 from numpy import random
 
 
-class MandelbrotGreyscale:
+class PixelatedFractal:
     ''''
     Pixel-coloring object for visualizing multibrot and multi-Julia sets.
     
@@ -24,7 +26,7 @@ class MandelbrotGreyscale:
         Determines image scale. Default is u_max/4.
     n_colors: int, optional
         Determines number of lemniscates to draw in addition to the set itself.
-        Default is 5.
+        Default is 7.
     window_center: complex
         Display centers on this point. Default is 0.
     exponent: complex, optional, default is 2.
@@ -95,7 +97,7 @@ class MandelbrotGreyscale:
     def chooseFromFractal(self):
         u_max, v_max = self.aspect_ratio
         u, v = (0, 0)
-        while self.pixelColor(u, v) > 0:
+        while (self.pixelColor(u, v) != 0).any():
             u = random.randint(u_max)
             v = random.randint(v_max)
         return u, v
@@ -118,15 +120,16 @@ class MandelbrotGreyscale:
         z = point
         for it in range(self.max_iter):
             z = f(z)
-            if np.abs(z) > 4:
+            if np.abs(z) > 2:
                 return it
         return np.infty    # TODO: this is a bit of a hack
     
     # get color of point from its escape time
     def colorFromTime(self, time):
-        # code quality? never met her
         #return 255 / self.n_colors * np.ceil(self.n_colors * (self.max_iter - time) / self.max_iter)
-        return int(255 / (self.n_colors + 1) * (self.time_quantiles > time).sum())
+        color = np.array([0, 255, 0])
+        dimness = (self.time_quantiles > time).sum() / (self.n_colors + 1)
+        return color * dimness
         
     # return color of a pixel
     def pixelColor(self, u, v):
@@ -137,7 +140,6 @@ class MandelbrotGreyscale:
     # Return a list of all colors used. More external colors are earlier.
     def colors(self):
         result = [self.colorFromTime(t) for t in range(self.max_iter)]
-        result.append(0)
-        result = np.unique(result)
+        result.append(np.zeros(3))
+        result = np.unique(result, axis=0)
         return list(result)
-    
