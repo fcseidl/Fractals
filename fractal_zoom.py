@@ -272,5 +272,9 @@ if __name__ == '__main__':
                                          julia_param=julia_param,
                                          max_iter=150)
     frame_iterator = fractalZoom(pixelated_fractal, scale_factor=6)
-    animate(aspect_ratio, frame_iterator, frame_rate=30)
+    animate(aspect_ratio, 
+            frame_iterator, 
+            fps=32,
+            title='fractalZoom',
+            video_dump=True)
     
