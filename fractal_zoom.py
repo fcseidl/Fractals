@@ -237,9 +237,9 @@ def fractalZoom(pixelated_fractal, scale_factor=4):
     zoom_level = 1
     while True:
         print('Zoom level %f' % zoom_level)
-        '''tracer = BorderTracer(frame, pixelated_fractal, speed=1000)
-        yield from tracer.generate()'''
-        frame = yield from fillFromTop(frame, pixelated_fractal, thickness=50)
+        tracer = BorderTracer(frame, pixelated_fractal, speed=1000)
+        yield from tracer.generate()
+        #frame = yield from fillFromTop(frame, pixelated_fractal, thickness=50)
         u, v = findLeftBorder(frame)
         yield from magnifySubframe(u, v, frame, scale_factor, duration=20)
         new_window_center = pixelated_fractal.pixelSpaceToC(u, v)
@@ -252,7 +252,7 @@ if __name__ == '__main__':
     from numpy import random
     seed = random.randint(1000000)
     
-    seed = 411405   # probably gorgeous with exponent 3.11, but bugged
+    #seed = 411405   # probably gorgeous with exponent 3.11, but bugged
     #seed = 540173   # cool with exponed 2.34
     #seed = 840746 # cool
     #seed = 949588 # also bugged
@@ -262,14 +262,14 @@ if __name__ == '__main__':
     random.seed(seed)
     
     aspect_ratio = (1400, 800)
-    exponent = 3.11
+    exponent = np.e
     mandelbrot = PixelatedFractal((960, 720), exponent=exponent, max_iter=100)
     u, v = mandelbrot.chooseFromFractal()
     julia_param = mandelbrot.pixelSpaceToC(u, v)
     pixelated_fractal = PixelatedFractal(aspect_ratio,
                                          exponent=exponent,
                                          n_colors=4,
-                                         julia_param=julia_param,
+                                         julia_param=None,#julia_param,
                                          max_iter=150)
     frame_iterator = fractalZoom(pixelated_fractal, scale_factor=6)
     animate(aspect_ratio, frame_iterator, frame_rate=30)
