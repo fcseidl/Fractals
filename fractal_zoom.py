@@ -23,9 +23,6 @@ from simple_animation import animate
 from pixelated_fractals import PixelatedFractal
 
 
-RED = np.array([255, 0, 0])
-
-
 # AUXILIARY FUNCTIONS
 
 # TODO: this sucks, find a better way to do it!
@@ -207,7 +204,6 @@ def fillFromTop(frame, pixelated_fractal, thickness=1):
         yield frame
     return frame
 
-
 # Zoom to region of frame centered on u, v with specified scale.
 # Note that the region must be entirely contained in the frame!
 def magnifySubframe(u, v, frame, scale_factor, duration):
@@ -225,21 +221,20 @@ def magnifySubframe(u, v, frame, scale_factor, duration):
             v_t = int((duration - t) * v_top / duration)
             w_t = int((t * u_max + (duration - t) * box_width) / duration)
             h_t = int((t * v_max + (duration - t) * box_height) / duration)
-            magnified = rescale(magnify, (w_t/box_width, h_t/box_height, 1))
-            frame[u_t:u_t+w_t, v_t:v_t+h_t] = magnified
+            frame[u_t:u_t+w_t, v_t:v_t+h_t] = rescale(magnify, (w_t/box_width, h_t/box_height, 1))
             yield frame
     except IndexError:
         raise ValueError('subregion to magnify must be contained in current frame')
      
 def fractalZoom(pixelated_fractal, scale_factor=4):
     u_max, v_max = pixelated_fractal.aspect_ratio
-    frame = 255 * np.ones((u_max, v_max, 3))
+    frame = 255 * np.ones((u_max, v_max, 3))  #, dtype='uint8') for some reason this breaks rescaling
     zoom_level = 1
     while True:
         print('Zoom level %f' % zoom_level)
-        tracer = BorderTracer(frame, pixelated_fractal, speed=1000)
-        yield from tracer.generate()
-        #frame = yield from fillFromTop(frame, pixelated_fractal, thickness=50)
+        '''tracer = BorderTracer(frame, pixelated_fractal, speed=1000)
+        yield from tracer.generate()'''
+        frame = yield from fillFromTop(frame, pixelated_fractal, thickness=10)
         u, v = findLeftBorder(frame)
         yield from magnifySubframe(u, v, frame, scale_factor, duration=20)
         new_window_center = pixelated_fractal.pixelSpaceToC(u, v)
@@ -261,15 +256,15 @@ if __name__ == '__main__':
     print('random seed =', seed)
     random.seed(seed)
     
-    aspect_ratio = (1400, 800)
-    exponent = np.e
+    aspect_ratio = (960, 720)
+    exponent = 2
     mandelbrot = PixelatedFractal((960, 720), exponent=exponent, max_iter=100)
     u, v = mandelbrot.chooseFromFractal()
     julia_param = mandelbrot.pixelSpaceToC(u, v)
     pixelated_fractal = PixelatedFractal(aspect_ratio,
                                          exponent=exponent,
-                                         n_colors=4,
-                                         julia_param=None,#julia_param,
+                                         n_colors=10,
+                                         julia_param=julia_param,
                                          max_iter=150)
     frame_iterator = fractalZoom(pixelated_fractal, scale_factor=6)
     animate(aspect_ratio, 

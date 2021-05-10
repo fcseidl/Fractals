@@ -47,6 +47,8 @@ class PixelatedFractal:
         return the color of a pixel using escape time algorithm
     '''
     
+    ESCAPED = np.infty
+    
     def __init__(self, 
                  aspect_ratio, 
                  pixels_per_unit=None, 
@@ -80,11 +82,12 @@ class PixelatedFractal:
         u = random.randint(u_max, size=n_samp)
         v = random.randint(v_max, size=n_samp)
         points = self.pixelSpaceToC(u, v)
-        times = sorted([self.escapeTime(p) for p in points])
+        times = np.array([self.escapeTime(p) for p in points])
+        times = times[times != self.ESCAPED]
         # set quantiles for histogram coloring
         self.time_quantiles = []
-        for n in range(1, self.n_colors + 1):
-            quantile = times[n * int(n_samp / (self.n_colors + 1))]
+        for n in range(1, self.n_colors):
+            quantile = times[n * int(len(times) / self.n_colors)]
             if n > 1:
                 floor = self.time_quantiles[-1] + 1
             else:
@@ -111,7 +114,7 @@ class PixelatedFractal:
         imag = imag_min + 1. * (v_max - v) / self.pixels_per_unit
         return real + imag*(0+1j)
     
-    # find min n for which |f^n(c)| > 4, max_iter if not found
+    # find min n for which |f^n(c)| > 2, max_iter if not found
     def escapeTime(self, point):
         if self.julia_param is None:
             f = lambda z : z**self.exponent + point
@@ -122,14 +125,16 @@ class PixelatedFractal:
             z = f(z)
             if np.abs(z) > 2:
                 return it
-        return np.infty    # TODO: this is a bit of a hack
+        return self.ESCAPED
     
     # get color of point from its escape time
     def colorFromTime(self, time):
-        #return 255 / self.n_colors * np.ceil(self.n_colors * (self.max_iter - time) / self.max_iter)
-        color = np.array([0, 255, 0])
-        dimness = (self.time_quantiles > time).sum() / (self.n_colors + 1)
-        return color * dimness
+        if time == self.ESCAPED:
+            return np.zeros(3)  # color set itself black
+        interior = np.array([255, 0, 0])
+        exterior = np.array([0, 0, 255])
+        mix = (self.time_quantiles > time).sum() / self.n_colors
+        return interior * (1- mix) + exterior * mix    # linear interpolation
         
     # return color of a pixel
     def pixelColor(self, u, v):

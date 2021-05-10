@@ -40,6 +40,7 @@ def animate(
             )
     for frame in frame_iterator:
         image = cv2.transpose(frame.astype('uint8'))
+        image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
         if video_dump:
             out.write(image)
         cv2.imshow(title, image)
