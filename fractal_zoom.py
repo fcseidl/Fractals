@@ -265,7 +265,7 @@ if __name__ == '__main__':
                                          exponent=exponent,
                                          n_colors=10,
                                          julia_param=julia_param,
-                                         max_iter=150)
+                                         max_iter=80)
     frame_iterator = fractalZoom(pixelated_fractal, scale_factor=6)
     animate(aspect_ratio, 
             frame_iterator, 

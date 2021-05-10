@@ -128,9 +128,10 @@ class PixelatedFractal:
         return self.ESCAPED
     
     # get color of point from its escape time
+    # TODO: avoid harcoded constant colors!
     def colorFromTime(self, time):
         if time == self.ESCAPED:
-            return np.zeros(3)  # color set itself black
+            return np.zeros(3)
         interior = np.array([255, 0, 0])
         exterior = np.array([0, 0, 255])
         mix = (self.time_quantiles > time).sum() / self.n_colors
