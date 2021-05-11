@@ -114,12 +114,42 @@ class PixelatedFractal:
         imag = imag_min + 1. * (v_max - v) / self.pixels_per_unit
         return real + imag*(0+1j)
     
+    # reverse coord transform
+    def CToPixelSpace(self, z):
+        u_max, v_max = self.aspect_ratio
+        z = np.atleast_1d(z)
+        real, imag = z.real, z.imag
+        real_max = u_max/2 / self.pixels_per_unit + self.window_center.real
+        imag_min = self.window_center.imag - v_max/2 / self.pixels_per_unit
+        u = (real - real_max) * self.pixels_per_unit + u_max
+        v = v_max - (imag - imag_min) * self.pixels_per_unit
+        u = u.astype(int)
+        v = v.astype(int)
+        if u.shape[0] == 1:
+            u, v = u[0], v[0]
+        return u, v
+    
+    # map to iterate at a point
+    def get_map(self, point):
+        if self.julia_param is None:
+            return lambda z : z**self.exponent + point
+        else:
+            return lambda z : z**self.exponent + self.julia_param
+    
+    # return  list of tuples representing pixels along orbit
+    def orbit_pixels(self, u, v, length):
+        point = self.pixelSpaceToC(u, v)
+        f = self.get_map(point)
+        orbit = [point]
+        while len(orbit) < length:
+            point = f(point)
+            orbit.append(point)
+        u, v = self.CToPixelSpace(np.array(orbit))
+        return list(zip(u, v))
+    
     # find min n for which |f^n(c)| > 2, max_iter if not found
     def escapeTime(self, point):
-        if self.julia_param is None:
-            f = lambda z : z**self.exponent + point
-        else:
-            f = lambda z : z**self.exponent + self.julia_param
+        f = self.get_map(point)
         z = point
         for it in range(self.max_iter):
             z = f(z)
