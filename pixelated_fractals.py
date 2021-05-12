@@ -115,7 +115,7 @@ class PixelatedFractal:
         return real + imag*(0+1j)
     
     # reverse coord transform
-    def CToPixelSpace(self, z):
+    def cToPixelSpace(self, z):
         u_max, v_max = self.aspect_ratio
         z = np.atleast_1d(z)
         real, imag = z.real, z.imag
@@ -144,7 +144,7 @@ class PixelatedFractal:
         while len(orbit) < length:
             point = f(point)
             orbit.append(point)
-        u, v = self.CToPixelSpace(np.array(orbit))
+        u, v = self.cToPixelSpace(np.array(orbit))
         return list(zip(u, v))
     
     # find min n for which |f^n(c)| > 2, max_iter if not found
@@ -165,7 +165,7 @@ class PixelatedFractal:
         interior = np.array([255, 0, 0])
         exterior = np.array([0, 0, 255])
         mix = (self.time_quantiles > time).sum() / self.n_colors
-        return interior * (1- mix) + exterior * mix    # linear interpolation
+        return interior * (1 - mix) + exterior * mix    # linear interpolation
         
     # return color of a pixel
     def pixelColor(self, u, v):
@@ -176,6 +176,6 @@ class PixelatedFractal:
     # Return a list of all colors used. More external colors are earlier.
     def colors(self):
         result = [self.colorFromTime(t) for t in range(self.max_iter)]
-        result.append(np.zeros(3))
+        result.append(self.colorFromTime(self.ESCAPED))
         result = np.unique(result, axis=0)
         return list(result)

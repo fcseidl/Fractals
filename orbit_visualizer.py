@@ -1,7 +1,9 @@
 '''
-Show orbits of points on top of fractals.
+Show orbits of points on top of a fractal.
 
 TODO: allow zoom!
+TODO: it takes forever to compute offscreen lines?
+TODO: precision is pretty bad
 '''
 
 import pygame
@@ -10,8 +12,8 @@ from pixelated_fractals import PixelatedFractal
 
 
 # set parameters
-frame_rate = 25
-orbit_length = 50
+frame_rate = 10
+orbit_length = 35
 orbit_color = (0, 255, 0)
 aspect_ratio = (960, 720)
 fractal = PixelatedFractal(aspect_ratio)
