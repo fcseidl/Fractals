@@ -1,7 +1,5 @@
 '''
 Create animations out of sequences of numpy arrays.
-
-TODO: dump animation to video file (with opencv?)
 '''
 
 
