@@ -256,7 +256,7 @@ if __name__ == '__main__':
     print('random seed =', seed)
     random.seed(seed)
     
-    aspect_ratio = (960, 720)
+    aspect_ratio = (1280, 960)
     exponent = 2
     mandelbrot = PixelatedFractal((960, 720), exponent=exponent, max_iter=100)
     u, v = mandelbrot.chooseFromFractal()
