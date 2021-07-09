@@ -5,8 +5,7 @@ TODO: I might make a superclass for the interface with subclasses inheriting
 it if I want more different types of fractals?
 
 TODO: cycle detection for quick termination of escape time algorithm
-TODO: arbitrary precision. Because 2^64 is only 0% of |C|. Not that arbitrary 
-precision would let us decide more than 0% of C...
+TODO: arbitrary precision.
 TODO: option for coloring based on how far away we get in fixed time
 '''
 
@@ -71,7 +70,6 @@ class PixelatedFractal:
         self.adjustZoom(1, window_center)
     
     # adjust zoom and recalculate quantiles for histogram coloring
-    # TODO: only consider external points in the histogram!
     def adjustZoom(self, scale_factor, new_window_center):
         # set view window
         self.pixels_per_unit *= scale_factor
@@ -93,7 +91,6 @@ class PixelatedFractal:
             else:
                 floor = 0
             self.time_quantiles.append(max(quantile, floor))
-        self.time_quantiles.append(self.max_iter + self.n_colors)
         self.time_quantiles = np.array(self.time_quantiles)
         
     # choose a random point in frame from a fractal by rejection sampling
@@ -163,8 +160,8 @@ class PixelatedFractal:
         if time == self.ESCAPED:
             return np.zeros(3)
         interior = np.array([255, 0, 0])
-        exterior = np.array([0, 0, 255])
-        mix = (self.time_quantiles > time).sum() / self.n_colors
+        exterior = np.array([255, 255, 255])
+        mix = (self.time_quantiles >= time).sum() / (self.n_colors - 1)
         return interior * (1 - mix) + exterior * mix    # linear interpolation
         
     # return color of a pixel
