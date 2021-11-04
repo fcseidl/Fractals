@@ -10,7 +10,7 @@ import cv2
 def animate(
     aspect_ratio, 
     frame_iterator, 
-    fps=10, 
+    fps=25, 
     title='animation',
     video_dump=False):
     '''
@@ -23,7 +23,7 @@ def animate(
     frame_iterator : iterator
         yields RGB frames contained in ndarrays of shape (max_u, max_v, 3)
     fps : int, optional
-        Frame rate. The default is 10.
+        Frame rate. The default is 25.
     title : str, optional
         Title of display window. The default is 'animation'.
     video_dump : bool, optional
@@ -38,7 +38,6 @@ def animate(
             )
     for frame in frame_iterator:
         image = cv2.transpose(frame.astype('uint8'))
-        image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
         if video_dump:
             out.write(image)
         cv2.imshow(title, image)
@@ -66,7 +65,7 @@ if __name__ == '__main__':
         fps=32, 
         title='fuzzyFadeIn',
         video_dump=True
-        )
+    )
             
         
         
