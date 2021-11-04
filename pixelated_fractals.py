@@ -159,10 +159,10 @@ class PixelatedFractal:
     def colorFromTime(self, time):
         if time == self.ESCAPED:
             return np.zeros(3)
-        interior = np.array([255, 0, 0])
-        exterior = np.array([255, 255, 255])
+        interior = np.array([0, 150, 0])
+        exterior = np.array([255, 0, 0])
         mix = (self.time_quantiles >= time).sum() / (self.n_colors - 1)
-        return interior * (1 - mix) + exterior * mix    # linear interpolation
+        return interior * (1 - mix)**0.5 + exterior * mix**0.5    # quadratic interpolation
         
     # return color of a pixel
     def pixelColor(self, u, v):

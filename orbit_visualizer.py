@@ -2,7 +2,6 @@
 Show orbits of points on top of a fractal.
 
 TODO: allow zoom!
-TODO: it takes forever to compute offscreen lines?
 TODO: precision is pretty bad
 '''
 
