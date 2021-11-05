@@ -214,7 +214,8 @@ def magnifySubframe(u, v, frame, scale_factor, duration):
             yield frame
     except IndexError:
         raise ValueError('subregion to magnify must be contained in current frame')
-     
+
+
 def fractalZoom(pixelated_fractal, zoom_point, scale_factor=4):
     """
     Zoom in on a point lying on the fractal boundary of a simply connected set.
@@ -224,12 +225,12 @@ def fractalZoom(pixelated_fractal, zoom_point, scale_factor=4):
     zoom_level = 1
     while True:
         print('Zoom level %f' % zoom_level)
-        '''tracer = BorderTracer(frame, 
+        tracer = BorderTracer(frame, 
                               pixelated_fractal, 
                               trace_speed=np.infty, 
                               fill_speed=25)
-        yield from tracer.generate()'''
-        frame = yield from fillFromTop(frame, pixelated_fractal, thickness=10)
+        yield from tracer.generate()
+        #frame = yield from fillFromTop(frame, pixelated_fractal, thickness=10)
         u, v = pixelated_fractal.cToPixelSpace(zoom_point)
         yield from magnifySubframe(u, v, frame, scale_factor, duration=20)
         new_window_center = pixelated_fractal.pixelSpaceToC(u, v)
@@ -245,7 +246,7 @@ if __name__ == '__main__':
     print('random seed =', seed)
     random.seed(seed)
     
-    aspect_ratio = (1280, 960)
+    aspect_ratio = (960, 720)
     exponent = 2
     mandelbrot = PixelatedFractal(aspect_ratio, 
                                   exponent=exponent,
