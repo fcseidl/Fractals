@@ -1,185 +1,18 @@
 '''
 Uses the PixelatedFractals module to animate fractal zooms as sequences of 
-numpy arrays, in the input format of the SimpleAnimation module.
+numpy arrays, which can be visualized using the SimpleAnimation module.
 
-TODO: fix streaking bug
-TODO: pretty colors!
-TODO: automatic interesting zoom
-TODO: quiet mode to minimize printed output
-TODO: loop mode to look cool for longer + find noteworthy seeds
-TODO: skew distribution toward interesting fractals
+TODO: simultaneous pan and zoom
+TODO: fix jitter from rounding aspect ratio
 
-One of these might obviate need for the other:
-TODO: Moore-neighbor tracing?
-TODO: use subpixel resolution in PixelatedFractal object?
-
-# way hard:
-TODO: continuous zoom
+way hard:
+TODO: allow exploration of fractal in real time with scroll bar and wasd
 '''
 
 import numpy as np
 from skimage.transform import rescale
 from simple_animation import animate
 from pixelated_fractals import PixelatedFractal
-
-
-# FRAME SEQUENCE GENERATORS 
-                
-# use border tracing algorithm to draw a pixelated fractal.
-# NOTE: the fractal MUST BE CONNECTED!
-class BorderTracer:
-    
-    NOT_COMPUTED = -1
-    OUT_OF_BOUNDS = -2
-    
-    CLOCKWISE = {'N':'E', 'E':'S', 'S':'W', 'W':'N'}
-    COUNTERCLOCKWISE = {'N':'W', 'W':'S', 'S':'E', 'E':'N'}
-    
-    def __init__(self, frame, pixelated_fractal, trace_speed, fill_speed):
-        self.frame = frame
-        self.pixelated_fractal = pixelated_fractal
-        self.trace_speed = trace_speed
-        self.fill_speed = fill_speed
-        
-        u_max, v_max = pixelated_fractal.aspect_ratio
-        self.colors = pixelated_fractal.colors()
-        self.trace = self.NOT_COMPUTED * np.ones((u_max, v_max), dtype=int)
-        self.traced_idxs = np.zeros(len(self.colors))
-    
-    # return index of pixel color in self.colors, avoiding re-deciding pixels 
-    # and bad indexing. Update frame when a new pixel is decided.
-    def safeDynamicIndex(self, u, v):
-        u_max, v_max = self.pixelated_fractal.aspect_ratio
-        if u < 0 or v < 0 or u >= u_max or v >= v_max:
-            return self.OUT_OF_BOUNDS
-        if self.trace[u, v] == self.NOT_COMPUTED:
-            c = self.pixelated_fractal.pixelColor(u, v)
-            self.frame[u, v] = c
-            idx = 0
-            while (self.colors[idx] != c).any():
-                idx += 1
-            self.trace[u, v] = idx
-        return self.trace[u, v]
-    
-    # Trace along the border of the lemniscate starting at u, v.
-    # Currently using square tracing.
-    def traceLemniscate(self, u, v, interior_color_idx, direction, stop_at_edge):
-        print('tracing lemniscate of color indexed by', interior_color_idx)
-        step = 0
-        u_start, v_start = u, v
-        while True:
-            # decide next step direction
-            idx = self.safeDynamicIndex(u, v)
-            if idx <= interior_color_idx:
-                direction = self.CLOCKWISE[direction]
-            else:
-                direction = self.COUNTERCLOCKWISE[direction]
-            # perform step
-            if direction == 'N': 
-                v -= 1
-            elif direction == 'E':
-                u += 1
-            elif direction == 'S':
-                v += 1
-            elif direction == 'W':
-                u -= 1
-            # stop when loop is completed
-            if u == u_start and v == v_start:
-                print('finished tracing lemniscate: came full circle')
-                break
-            if idx == self.OUT_OF_BOUNDS and stop_at_edge:
-                print('finished tracing lemniscate: went out of bounds')
-                break
-            # render progress
-            if step % self.trace_speed == 0:
-                yield self.frame
-            step += 1
-        
-    # trace edges of frame, stopping to trace lemniscates we cross
-    # TODO: minimize code duplication
-    def traceEdges(self):
-        print('tracing edges')
-        u_max, v_max = self.pixelated_fractal.aspect_ratio
-        # top left corner
-        prev = self.safeDynamicIndex(0, 0)
-        # top
-        for u in range(1, u_max):
-            current = self.safeDynamicIndex(u, 0)
-            if current != prev:
-                if current < prev:
-                    yield from self.traceLemniscate(u, 0, current, 'E', stop_at_edge=True)
-                    self.traced_idxs[current] = 1
-                prev = current
-        # right
-        for v in range(1, v_max):
-            current = self.safeDynamicIndex(u_max-1, v)
-            if current != prev:
-                if current < prev:
-                    yield from self.traceLemniscate(u_max-1, v, current, 'S', stop_at_edge=True)
-                    self.traced_idxs[current] = 1
-                prev = current
-        # bottom
-        for u in range(u_max-2, -1, -1):
-            current = self.safeDynamicIndex(u, v_max-1)
-            if current != prev:
-                if current < prev:
-                    yield from self.traceLemniscate(u, v_max-1, current, 'W', stop_at_edge=True)
-                    self.traced_idxs[current] = 1
-                prev = current
-        # left
-        for v in range(v_max-2, -1, -1):
-            current = self.safeDynamicIndex(0, v)
-            if current != prev:
-                if current < prev:
-                    yield from self.traceLemniscate(0, v, current, 'N', stop_at_edge=True)
-                    self.traced_idxs[current] = 1
-                prev = current
-        # now we've traced the outermost lemnscate too
-        self.traced_idxs[-1] = 1
-        print('finished tracing edges')
-    
-    # search trace all untraced lemniscates crossing a column
-    def traceCol(self, u):
-        print('trace column', u)
-        u_max, v_max = self.pixelated_fractal.aspect_ratio
-        prev = self.safeDynamicIndex(u, 0)
-        for v in range(1, v_max):
-            current = self.safeDynamicIndex(u, v)
-            if current != prev:
-                for idx in range(current, prev):
-                    if not self.traced_idxs[idx]:
-                        yield from self.traceLemniscate(u, v, idx, 'S', stop_at_edge=False)
-                        self.traced_idxs[idx] = 1
-                prev = current
-        print('finished tracing column')
-    
-    # after tracing borders, fill region interiors
-    def fillRegions(self):
-        print('filling in colored regions')
-        u_max, v_max = self.pixelated_fractal.aspect_ratio
-        for u in range(u_max):
-            if u % self.fill_speed == 0:
-                yield self.frame
-            idx = self.trace[u, 0]
-            for v in range(1, v_max):
-                if self.trace[u, v] == self.NOT_COMPUTED:
-                    self.frame[u, v] = self.colors[idx]
-                else:
-                    idx = self.trace[u, v]
-        print('finished filling')
-    
-    # animate tracing all borders and filling in colors
-    def generate(self):
-        print(self.colors)
-        print('need to trace colors indexed by', 
-              np.argwhere(self.traced_idxs - 1).reshape(-1))
-        yield from self.traceEdges()
-        if not self.traced_idxs.all():
-            print('need to trace colors indexed by', 
-                  np.argwhere(self.traced_idxs - 1).reshape(-1))
-            u, v = self.pixelated_fractal.chooseFromFractal()
-            yield from self.traceCol(u)
-        yield from self.fillRegions()
         
 
 # fill a frame with a pixelated fractal from the top
@@ -188,7 +21,7 @@ def fillFromTop(frame, pixelated_fractal, thickness=1):
     yield frame
     for v in range(0, v_max, thickness):
         for u in range(u_max):
-            for dv in range(thickness):
+            for dv in range(min(thickness, v_max - v)):
                 frame[u, v+dv] = pixelated_fractal.pixelColor(u, v+dv)
         yield frame
     return frame
@@ -215,26 +48,76 @@ def magnifySubframe(u, v, frame, scale_factor, duration):
     except IndexError:
         raise ValueError('subregion to magnify must be contained in current frame')
      
-def fractalZoom(pixelated_fractal, zoom_point, scale_factor=4):
-    """
-    Zoom in on a point lying on the fractal boundary of a simply connected set.
-    """
+def uglyZoom(pixelated_fractal, zoom_point, scale_factor=4):
+    """Repeatedly zoom and enhance, with noticeable discrete steps."""
     u_max, v_max = pixelated_fractal.aspect_ratio
     frame = 255 * np.ones((u_max, v_max, 3))  #, dtype='uint8') for some reason this breaks rescaling
     zoom_level = 1
     while True:
         print('Zoom level %f' % zoom_level)
-        '''tracer = BorderTracer(frame, 
-                              pixelated_fractal, 
-                              trace_speed=np.infty, 
-                              fill_speed=25)
-        yield from tracer.generate()'''
         frame = yield from fillFromTop(frame, pixelated_fractal, thickness=10)
         u, v = pixelated_fractal.cToPixelSpace(zoom_point)
         yield from magnifySubframe(u, v, frame, scale_factor, duration=20)
         new_window_center = pixelated_fractal.pixelSpaceToC(u, v)
         pixelated_fractal.adjustZoom(scale_factor, new_window_center)
         zoom_level *= scale_factor
+
+
+def smoothZoom(pixelated_fractal, zoom_point, doubling_frames=256, _sf=np.sqrt(np.e)):
+    """
+    Continuous zoom towards a fixed point, doubling resolution every fixed 
+    number of frames. Achieved by interpolating a sequence of images at 
+    resolutions increasing by a factor of _sf, which by default takes the 
+    optimal value sqrt(e).
+    """
+    # center pixelated_fractal on target point and increase resolution
+    pixelated_fractal.adjustZoom(1.0, zoom_point)
+    u_max, v_max = pixelated_fractal.aspect_ratio
+    pixelated_fractal.adjustResolution(_sf)
+    # copy fractal object will be used to precompute image at next resolution
+    subpixel_fractal = pixelated_fractal.deepcopy()
+    subpixel_frame = 255 * np.ones(subpixel_fractal.aspect_ratio + (3,))
+    # fill from top while preparing subpixel frame for zoom
+    for subpixel_frame in fillFromTop(subpixel_frame, 
+                                      subpixel_fractal, 
+                                      thickness=20):
+        yield rescale(subpixel_frame, (1/_sf, 1/_sf, 1))
+        
+    # constants
+    sub_u_max, sub_v_max = subpixel_fractal.aspect_ratio
+    zoom_per_frame = 2 ** (1 / doubling_frames)
+    sf_frames = int(np.log(_sf) / np.log(zoom_per_frame))
+    
+    # zoom in while preparing a subimage at higher resolution
+    while True:
+        northwest = subpixel_fractal.pixelSpaceToC(0, 0) - zoom_point
+        southeast = subpixel_fractal.pixelSpaceToC(sub_u_max - 1, sub_v_max - 1) - zoom_point
+        new_subpixel_frame = np.empty_like(subpixel_frame)
+        subpixel_fractal.adjustZoom(_sf, zoom_point)
+        
+        v_filled = 0
+        for n in range(sf_frames):
+            # compute coordinates of new corners in subpixel resolution
+            u_west, v_north = pixelated_fractal.cToPixelSpace(zoom_point + (northwest / zoom_per_frame**n))
+            u_east, v_south = pixelated_fractal.cToPixelSpace(zoom_point + (southeast / zoom_per_frame**n))
+            yield rescale(
+                subpixel_frame[u_west:u_east, v_north:v_south],
+                (zoom_per_frame**n / _sf, zoom_per_frame**n / _sf, 1)
+                )
+            
+            # compute more of the new subpixel frame
+            fill_to = int((n + 1) * sub_v_max / sf_frames)
+            for v in range(v_filled, fill_to):
+                for u in range(sub_u_max):
+                    new_subpixel_frame[u, v] = subpixel_fractal.pixelColor(u, v)
+            v_filled = fill_to
+        
+        subpixel_frame = new_subpixel_frame
+        pixelated_fractal.adjustZoom(_sf, zoom_point)
+            
+            
+            
+    
 
 
 # example zoom
@@ -245,20 +128,27 @@ if __name__ == '__main__':
     print('random seed =', seed)
     random.seed(seed)
     
-    aspect_ratio = (1280, 960)
+    aspect_ratio = (640, 480)
     exponent = 2
+    
+    # quadratically interpolate color cycle
+    N = 11
+    color_cycle = [np.array([255, 0, 0]) * (1 - n/N)**2 
+                   + np.array([0, 0, 255]) * (n/N)**2
+                   for n in range(N+1)]
+    
     mandelbrot = PixelatedFractal(aspect_ratio, 
                                   exponent=exponent,
-                                  n_colors=5,
-                                  max_iter=100)
-    '''u, v = mandelbrot.chooseFromFractal()
-    julia_param = mandelbrot.pixelSpaceToC(u, v)
-    pixelated_fractal = PixelatedFractal(aspect_ratio,
-                                         exponent=exponent,
-                                         n_colors=5,
-                                         julia_param=julia_param,
-                                         max_iter=80)'''
-    frame_iterator = fractalZoom(mandelbrot, -1.401155189+0j, scale_factor=4.66920109)
+                                  color_cycle=color_cycle,
+                                  max_iter=60)
+    # zoom toward Feigenbaum point looks periodic
+    '''frame_iterator = uglyZoom(mandelbrot, 
+                              zoom_point=-1.401155189+0j, 
+                              scale_factor=4.66920109)'''
+    frame_iterator = smoothZoom(mandelbrot, 
+                                doubling_frames=98, 
+                                zoom_point=-2#-1.401155189+0j
+                                )
     animate(aspect_ratio, 
             frame_iterator, 
             fps=32,

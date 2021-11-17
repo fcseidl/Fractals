@@ -21,7 +21,7 @@ def animate(
     aspect_ratio : tuple
         (max_u, max_v)
     frame_iterator : iterator
-        yields RGB frames contained in ndarrays of shape (max_u, max_v, 3)
+        yields BGR frames contained in ndarrays of shape (max_u, max_v, 3)
     fps : int, optional
         Frame rate. The default is 25.
     title : str, optional

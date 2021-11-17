@@ -7,6 +7,8 @@ it if I want more different types of fractals?
 TODO: cycle detection for quick termination of escape time algorithm
 TODO: arbitrary precision.
 TODO: option for coloring based on how far away we get in fixed time
+
+TODO: make it faster! Exploit numpy broadcasting as much as possible
 '''
 
 import numpy as np
@@ -21,11 +23,12 @@ class PixelatedFractal:
     ----------
     aspect_ratio: tuple
         Aspect ratio (u_max, v_max) to display.
+    color_cycle: list, optional
+        A point which diverges in k iterations will be given the color 
+        specified by color_cycle[k % len(color_cycle)]. By default the only 
+        color used will be white.
     pixels_per_unit: numeric, optional
         Determines image scale. Default is u_max/4.
-    n_colors: int, optional
-        Determines number of lemniscates to draw in addition to the set itself.
-        Default is 7.
     window_center: complex
         Display centers on this point. Default is 0.
     exponent: complex, optional, default is 2.
@@ -46,12 +49,12 @@ class PixelatedFractal:
         return the color of a pixel using escape time algorithm
     '''
     
-    ESCAPED = np.infty
+    NOT_ESCAPED = np.infty
     
     def __init__(self, 
                  aspect_ratio, 
+                 color_cycle=[np.array([255,255,255])],
                  pixels_per_unit=None, 
-                 n_colors=7,
                  window_center=0,
                  exponent=2, 
                  julia_param=None,
@@ -66,32 +69,31 @@ class PixelatedFractal:
             self.pixels_per_unit = aspect_ratio[0] / 4
         else:
             self.pixels_per_unit = pixels_per_unit
-        self.n_colors = n_colors
+        self.color_cycle = color_cycle
         self.adjustZoom(1, window_center)
+        
+    # create a deep copy of this object
+    def deepcopy(self):
+        return PixelatedFractal(
+            self.aspect_ratio,
+            self.color_cycle,
+            self.pixels_per_unit,
+            self.window_center,
+            self.exponent,
+            self.julia_param,
+            self.max_iter,
+        )
     
-    # adjust zoom and recalculate quantiles for histogram coloring
+    # Change resolution by a factor of sf without moving viewport
+    def adjustResolution(self, sf):
+        self.aspect_ratio = (int(self.aspect_ratio[0] * sf),
+                             int(self.aspect_ratio[1] * sf))
+        self.pixels_per_unit *= sf
+    
+    # adjust zoom to new center and scale factor
     def adjustZoom(self, scale_factor, new_window_center):
-        # set view window
         self.pixels_per_unit *= scale_factor
         self.window_center = complex(new_window_center)
-        # randomly sample a bunch of escape times
-        u_max, v_max = self.aspect_ratio
-        n_samp = 15 * self.max_iter * self.n_colors
-        u = random.randint(u_max, size=n_samp)
-        v = random.randint(v_max, size=n_samp)
-        points = self.pixelSpaceToC(u, v)
-        times = np.array([self.escapeTime(p) for p in points])
-        times = times[times != self.ESCAPED]
-        # set quantiles for histogram coloring
-        self.time_quantiles = []
-        for n in range(1, self.n_colors):
-            quantile = times[n * int(len(times) / self.n_colors)]
-            if n > 1:
-                floor = self.time_quantiles[-1] + 1
-            else:
-                floor = 0
-            self.time_quantiles.append(max(quantile, floor))
-        self.time_quantiles = np.array(self.time_quantiles)
         
     # choose a random point in frame from a fractal by rejection sampling
     def chooseFromFractal(self):
@@ -144,7 +146,7 @@ class PixelatedFractal:
         u, v = self.cToPixelSpace(np.array(orbit))
         return list(zip(u, v))
     
-    # find min n for which |f^n(c)| > 2, max_iter if not found
+    # find min n for which |f^n(c)| > 2, or NOT_ESCAPED sentinel value
     def escapeTime(self, point):
         f = self.get_map(point)
         z = point
@@ -152,27 +154,16 @@ class PixelatedFractal:
             z = f(z)
             if np.abs(z) > 2:
                 return it
-        return self.ESCAPED
+        return self.NOT_ESCAPED
     
     # get color of point from its escape time
-    # TODO: avoid harcoded constant colors!
     def colorFromTime(self, time):
-        if time == self.ESCAPED:
+        if time == self.NOT_ESCAPED:
             return np.zeros(3)
-        interior = np.array([0, 150, 0])
-        exterior = np.array([255, 0, 0])
-        mix = (self.time_quantiles >= time).sum() / (self.n_colors - 1)
-        return interior * (1 - mix)**0.5 + exterior * mix**0.5    # quadratic interpolation
+        return self.color_cycle[time % len(self.color_cycle)]
         
     # return color of a pixel
     def pixelColor(self, u, v):
         point = self.pixelSpaceToC(u, v)
         time = self.escapeTime(point)
         return self.colorFromTime(time)
-    
-    # Return a list of all colors used. More external colors are earlier.
-    def colors(self):
-        result = [self.colorFromTime(t) for t in range(self.max_iter)]
-        result.append(self.colorFromTime(self.ESCAPED))
-        result = np.unique(result, axis=0)
-        return list(result)
