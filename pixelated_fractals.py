@@ -45,8 +45,10 @@ class PixelatedFractal:
         zoom in by a scale factor towards a new center
     pixelSpaceToC(u, v)
         convert pixel coordinates to the complex plane
-    color(u, v)
-        return the color of a pixel using escape time algorithm
+    pixelColor(u, v)
+        return the color of a single pixel using escape time algorithm
+    
+    TODO: update docstring!
     '''
     
     NOT_ESCAPED = np.infty
@@ -135,7 +137,7 @@ class PixelatedFractal:
         else:
             return lambda z : z**self.exponent + self.julia_param
     
-    # return  list of tuples representing pixels along orbit
+    # return list of tuples representing pixels along orbit
     def orbit_pixels(self, u, v, length):
         point = self.pixelSpaceToC(u, v)
         f = self.get_map(point)

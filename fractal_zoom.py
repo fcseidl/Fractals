@@ -115,9 +115,6 @@ def smoothZoom(pixelated_fractal, zoom_point, doubling_frames=256, _sf=np.sqrt(n
         subpixel_frame = new_subpixel_frame
         pixelated_fractal.adjustZoom(_sf, zoom_point)
             
-            
-            
-    
 
 
 # example zoom
@@ -147,7 +144,7 @@ if __name__ == '__main__':
                               scale_factor=4.66920109)'''
     frame_iterator = smoothZoom(mandelbrot, 
                                 doubling_frames=98, 
-                                zoom_point=-2#-1.401155189+0j
+                                zoom_point=-1.401155189+0j
                                 )
     animate(aspect_ratio, 
             frame_iterator, 

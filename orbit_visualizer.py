@@ -12,10 +12,18 @@ from pixelated_fractals import PixelatedFractal
 
 # set parameters
 frame_rate = 10
-orbit_length = 35
+orbit_length = 50
 orbit_color = (0, 255, 0)
-aspect_ratio = (960, 720)
-fractal = PixelatedFractal(aspect_ratio)
+aspect_ratio = (1280, 800)
+
+# quadratically interpolate color cycle. 
+# note pygame orders RGB differently from opencv
+N = 11
+color_cycle = [np.array([0, 0, 255]) * (1 - n/N)**2 
+               + np.array([255, 0, 0]) * (n/N)**2
+               for n in range(N+1)]
+
+fractal = PixelatedFractal(aspect_ratio, color_cycle=color_cycle)
 
 # use precomputed previous background or recompute?
 if 1:
